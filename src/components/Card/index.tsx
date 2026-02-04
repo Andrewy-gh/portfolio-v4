@@ -31,9 +31,11 @@ export default function Card({ project }: CardProps) {
         <button className={`button__primary`}>
           <a href={project.liveLink}>Check out the Site</a>
         </button>
-        <button className={`button__secondary`}>
-          <a href={project.githubLink}>Check out the Code</a>
-        </button>
+        {project.githubLink ? (
+          <button className={`button__secondary`}>
+            <a href={project.githubLink}>Check out the Code</a>
+          </button>
+        ) : null}
         <details>
           <summary>Featured Tech:</summary>
           <div className={`techs`}>
