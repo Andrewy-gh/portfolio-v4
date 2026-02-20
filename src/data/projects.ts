@@ -49,7 +49,7 @@ export const projects = [
     id: 3,
     name: "Cut Above Barbershop",
     desc: "Barbershop web page. Features booking of appointments, user account registration, appointment modification, and email services. Previously, Authentication secured by JWT. Currently authentication is handled by cookie based sessions. Material UI components. Redux for state management and data fetching. Redis for pub/sub handling of email  services.",
-    liveLink: "http://cutabove.fly.dev",
+    liveLink: "http://cut-above.vercel.app/",
     githubLink: "https://github.com/Andrewy-gh/cut-above-barbershop",
     techs: [
       "React",
@@ -69,7 +69,7 @@ export const projects = [
     id: 4,
     name: "Takashi Photography",
     desc: "A Portfolio site for an international photographer. Drag and drop images for organization. Images optimized via Cloudinary CDN. Authentication secured by JWT.",
-    liveLink: "https://takashi-photos.fly.dev",
+    liveLink: "https://takashi-photo.vercel.app/",
     githubLink: "https://github.com/Andrewy-gh//takashi-portfolio-full-stack",
     techs: [
       "React",
