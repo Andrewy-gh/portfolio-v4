@@ -7,7 +7,7 @@ export default function Home() {
     <div className={styles.grid__container}>
       <div className={styles.text}>
         <h1>
-          <span>Hi, I'm Andrew</span>
+          <span>Hi, I'm Andy</span>
           <span className={styles.wave}>👋🏻</span>
         </h1>
         <TypeWriterEffect
