@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "portfolio-agent-readiness",
+  "main": "cloudflare/markdown-negotiation.js",
+  "compatibility_date": "2026-07-22",
+  "routes": [
+    {
+      "pattern": "andrewy.me/*",
+      "zone_name": "andrewy.me"
+    }
+  ]
+}
