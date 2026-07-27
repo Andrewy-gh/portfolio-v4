@@ -1,0 +1,14 @@
+---
+import { Icon } from 'astro-icon/components';
+import { socials } from '../data/socials';
+---
+
+{
+  socials.map((social) => (
+    <div>
+      <a href={social.link} target="_blank" rel="noopener noreferrer" aria-label={social.name}>
+        <Icon name={social.icon} />
+      </a>
+    </div>
+  ))
+}

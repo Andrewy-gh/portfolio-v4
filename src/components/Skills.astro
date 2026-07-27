@@ -1,0 +1,19 @@
+---
+import { Icon } from 'astro-icon/components';
+import styles from './Skills.module.css';
+import { skills } from '../data/skills';
+---
+
+<h2>My Skills</h2>
+<div class={styles.skills}>
+  {
+    skills.map((skill) => (
+      <div class={styles.skill}>
+        <div class={styles.icon}>
+          <Icon name={skill.icon} />
+        </div>
+        {skill.name}
+      </div>
+    ))
+  }
+</div>

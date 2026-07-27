@@ -1,0 +1,59 @@
+---
+import { Icon } from 'astro-icon/components';
+import Socials from './Socials.astro';
+import styles from './NavBar.module.css';
+---
+
+<nav class="container">
+  <button
+    type="button"
+    class={styles.hamburger}
+    data-hamburger
+    aria-label="Toggle navigation menu"
+    aria-expanded="false"
+  >
+    <Icon name="feather:menu" class="icon__open" />
+    <Icon name="feather:x" class="icon__close" />
+  </button>
+
+  <div class={styles.nav__lg}>
+    <div><a href="#work" class="nav__item">Work</a></div>
+    <div><a href="#about" class="nav__item">About</a></div>
+    <div class={styles.nav__social}><Socials /></div>
+  </div>
+
+  <button type="button" class={`${styles.theme__switch} theme__switch`} data-theme-toggle aria-label="Toggle colour theme">
+    <Icon name="feather:moon" class="icon__moon" />
+    <Icon name="feather:sun" class="icon__sun" />
+  </button>
+</nav>
+
+<div class={`container ${styles.transition}`} data-menu-wrapper>
+  <div class={`menu ${styles.menu}`} data-menu>
+    <div><a href="#work" class="nav__item">Work</a></div>
+    <div><a href="#about" class="nav__item">About</a></div>
+    <div class={styles.nav__social}><Socials /></div>
+  </div>
+</div>
+
+<script>
+  // `open` and `light` are hashed CSS-module / global class names, so read the
+  // module-scoped one off the element that already carries the styles.
+  const openClass = (await import('./NavBar.module.css')).default.open;
+
+  const hamburger = document.querySelector<HTMLButtonElement>('[data-hamburger]');
+  const wrapper = document.querySelector<HTMLElement>('[data-menu-wrapper]');
+  const menu = document.querySelector<HTMLElement>('[data-menu]');
+
+  hamburger?.addEventListener('click', () => {
+    const open = hamburger.classList.toggle(openClass);
+    wrapper?.classList.toggle(openClass, open);
+    menu?.classList.toggle(openClass, open);
+    hamburger.setAttribute('aria-expanded', String(open));
+  });
+
+  const app = document.querySelector<HTMLElement>('.App');
+  document
+    .querySelector<HTMLButtonElement>('[data-theme-toggle]')
+    ?.addEventListener('click', () => app?.classList.toggle('light'));
+</script>

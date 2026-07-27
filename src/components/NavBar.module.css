@@ -20,6 +20,10 @@ nav {
 
 .theme__switch {
   cursor: pointer;
+  background: none;
+  padding: 0;
+  color: inherit;
+  display: flex;
 }
 
 .menu {
@@ -45,6 +49,25 @@ nav {
 
 .open.transition {
   transform: translateY(0);
+}
+
+.hamburger {
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  color: inherit;
+  display: flex;
+}
+
+/* Show the icon for the action available: closed -> menu, open -> x. */
+.hamburger .icon__close {
+  display: none;
+}
+.hamburger.open .icon__close {
+  display: block;
+}
+.hamburger.open .icon__open {
+  display: none;
 }
 
 @media only screen and (min-width: 800px) {

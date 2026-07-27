@@ -1,0 +1,12 @@
+---
+import Card from './Card.astro';
+import { projects } from '../data/projects';
+---
+
+<div id="work">
+  <h2>Recent Work</h2>
+
+  <div class="flow">
+    {projects.map((project) => <div><Card project={project} /></div>)}
+  </div>
+</div>

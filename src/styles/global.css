@@ -1,3 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;600;700;800;900&display=swap');
+
+/* ? Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+/* Images carry width/height attributes so the browser can reserve space before
+   they load; height:auto keeps the aspect ratio once max-width shrinks them. */
+img {
+  height: auto;
+}
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+button {
+  border: none;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 :root {
   --text: rgb(246, 254, 252);
   --background: rgb(5, 41, 34);
@@ -72,6 +127,7 @@ body {
   margin: 0;
   min-height: 100dvh;
   height: fit-content;
+  isolation: isolate;
 }
 
 .container {
@@ -105,10 +161,19 @@ summary {
   color: var(--light-accent);
 }
 
-button {
+button,
+.button__primary,
+.button__secondary {
   cursor: pointer;
   border-radius: 0.5rem;
   padding: 0.5rem 1rem;
+}
+
+/* Rendered as anchors rather than buttons wrapping anchors, so they need the
+   inline-block box that `button` gets for free. */
+.button__primary,
+.button__secondary {
+  display: inline-block;
 }
 
 .button__primary {
@@ -210,4 +275,15 @@ button {
 
 .contact h4 {
   color: var(--text);
+}
+
+/* ? Theme toggle: show the icon for the mode you can switch *to*. */
+.theme__switch .icon__sun {
+  display: none;
+}
+.light .theme__switch .icon__sun {
+  display: block;
+}
+.light .theme__switch .icon__moon {
+  display: none;
 }

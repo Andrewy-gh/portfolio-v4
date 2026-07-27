@@ -1,0 +1,63 @@
+---
+import { Image } from 'astro:assets';
+import styles from './Home.module.css';
+import swd from '../assets/Software-Developer.svg';
+import { site } from '../data/site';
+
+// The first phrase is rendered as real text so crawlers (and anyone with JS
+// off) read it; the script below takes over and cycles the rest.
+const [firstPhrase] = site.typewriter;
+---
+
+<div class={styles.grid__container}>
+  <div class={styles.text}>
+    <h1>
+      <span>Hi, I'm {site.name.split(' ')[0]}</span>
+      <span class={styles.wave}>👋🏻</span>
+    </h1>
+    <div
+      class={styles.typewriter}
+      data-typewriter
+      data-phrases={JSON.stringify(site.typewriter)}
+    >
+      {firstPhrase}
+    </div>
+  </div>
+  <div>
+    <Image src={swd} alt="software developer illustration" loading="eager" />
+  </div>
+
+  <!-- Kept inside the component root so it is not a stray child of .container.flow -->
+  <script>
+  const el = document.querySelector<HTMLElement>('[data-typewriter]');
+  const phrases: string[] = JSON.parse(el?.dataset.phrases ?? '[]');
+
+  if (el && phrases.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const TYPE_MS = 35;
+    const HOLD_MS = 1500;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    (async () => {
+      // The first phrase is already on screen from the server render.
+      let index = 0;
+      let text = phrases[0];
+
+      for (;;) {
+        await sleep(HOLD_MS);
+        while (text.length) {
+          text = text.slice(0, -1);
+          el.textContent = text;
+          await sleep(TYPE_MS / 2);
+        }
+        index = (index + 1) % phrases.length;
+        const next = phrases[index];
+        while (text.length < next.length) {
+          text = next.slice(0, text.length + 1);
+          el.textContent = text;
+          await sleep(TYPE_MS);
+        }
+      }
+    })();
+  }
+  </script>
+</div>

@@ -1,0 +1,15 @@
+---
+import styles from './About.module.css';
+import Skills from './Skills.astro';
+import { about } from '../data/site';
+---
+
+<div id="about" class={styles.flex}>
+  <div class={`flow ${styles.about__flow}`}>
+    <h2>About Me</h2>
+    {about.map((paragraph) => <p>{paragraph}</p>)}
+  </div>
+  <div>
+    <Skills />
+  </div>
+</div>

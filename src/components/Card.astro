@@ -1,0 +1,45 @@
+---
+import styles from './Card.module.css';
+import type { Project } from '../data/projects';
+
+interface Props {
+  project: Project;
+}
+
+const { project } = Astro.props;
+---
+
+<div class={styles.card}>
+  <a href={project.liveLink}>
+    <picture>
+      <source media="(max-width: 799px)" srcset={project.smallImg.src} />
+      <source media="(min-width: 800px)" srcset={project.largeImg.src} />
+      <img
+        src={project.largeImg.src}
+        width={project.largeImg.width}
+        height={project.largeImg.height}
+        alt={`${project.name} screenshot`}
+        loading="lazy"
+        decoding="async"
+      />
+    </picture>
+  </a>
+  <div class={`flow ${styles.card__flow}`}>
+    <h3>{project.name}</h3>
+    <p>{project.desc}</p>
+    <a class="button__primary" href={project.liveLink}>Check out the Site</a>
+    {
+      project.githubLink && (
+        <a class="button__secondary" href={project.githubLink}>
+          Check out the Code
+        </a>
+      )
+    }
+    <details>
+      <summary>Featured Tech:</summary>
+      <div class="techs">
+        {project.techs.map((item) => <div class="body2">{item}</div>)}
+      </div>
+    </details>
+  </div>
+</div>

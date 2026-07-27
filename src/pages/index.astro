@@ -1,0 +1,22 @@
+---
+import Base from '../layouts/Base.astro';
+import NavBar from '../components/NavBar.astro';
+import Home from '../components/Home.astro';
+import Projects from '../components/Projects.astro';
+import About from '../components/About.astro';
+import Contact from '../components/Contact.astro';
+---
+
+<Base>
+  <div class="App">
+    <NavBar />
+    <div class="container flow">
+      <Home />
+      <Projects />
+      <About />
+    </div>
+    <div class="contact">
+      <Contact />
+    </div>
+  </div>
+</Base>
