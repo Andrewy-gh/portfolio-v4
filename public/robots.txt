@@ -1,4 +1,16 @@
+# Content signals declare how this site's content may be used.
+#
+#   search:   building a search index and returning links and short excerpts.
+#             Does not include AI-generated search summaries.
+#   ai-input: using content as live input to an AI model (retrieval-augmented
+#             generation, grounding, generative search answers).
+#   ai-train: training or fine-tuning AI models.
+#
+# A signal set to "no" is an express reservation of rights under Article 4 of
+# European Union Directive 2019/790 on copyright in the Digital Single Market.
+
 User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
 Allow: /
 
 Sitemap: https://andrewy.me/sitemap.xml
