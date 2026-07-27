@@ -34,10 +34,8 @@ export const GET: APIRoute = () => {
     '',
   ].join('\n');
 
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      Link: '</>; rel="alternate"; type="text/html", </index.md>; rel="alternate"; type="text/markdown"',
-    },
-  });
+  // This is a static build, so only the body survives into dist/llms.txt —
+  // response headers set here are discarded. Content-Type and Link for this
+  // resource are set by cloudflare/markdown-negotiation.js.
+  return new Response(body);
 };

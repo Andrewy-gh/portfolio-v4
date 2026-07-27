@@ -1,5 +1,6 @@
 const HTML_TYPE = 'text/html; charset=utf-8';
 const MARKDOWN_TYPE = 'text/markdown; charset=utf-8';
+const TEXT_TYPE = 'text/plain; charset=utf-8';
 
 const HTML_PATHS = new Set(['/', '/index.html']);
 const MARKDOWN_PATH = '/index.md';
@@ -75,22 +76,27 @@ function parseAccept(header) {
  * Best q-value the client offered for a media type, considering `type/*` and
  * `*​/*` wildcards. Returns -1 when nothing in the header matches at all.
  * `explicit` distinguishes a wildcard match from the client naming the type.
+ *
+ * RFC 9110 §12.5.1: the most specific reference has precedence. An entry naming
+ * the exact type therefore decides on its own — including an explicit `q=0`,
+ * which a wildcard must not be able to raise back up. Taking a plain max across
+ * both kinds of match would let a header that excludes HTML with `q=0` and then
+ * accepts a bare wildcard still be served HTML.
  */
 function negotiate(entries, mediaType) {
   const wildcard = `${mediaType.split('/')[0]}/*`;
-  let q = -1;
-  let explicit = false;
+  let exact = -1;
+  let wild = -1;
 
   for (const entry of entries) {
     if (entry.type === mediaType) {
-      q = Math.max(q, entry.q);
-      explicit = true;
+      exact = Math.max(exact, entry.q);
     } else if (entry.type === wildcard || entry.type === '*/*') {
-      q = Math.max(q, entry.q);
+      wild = Math.max(wild, entry.q);
     }
   }
 
-  return { q, explicit };
+  return exact >= 0 ? { q: exact, explicit: true } : { q: wild, explicit: false };
 }
 
 /**
@@ -168,12 +174,16 @@ export default {
     // the discovery headers so clients can navigate back to the HTML.
     if (pathname === MARKDOWN_PATH || pathname === LLMS_PATH) {
       const response = await fetch(request);
+      const isMarkdown = pathname === MARKDOWN_PATH;
 
       return withHeaders(response, (headers) => {
-        headers.set(
-          'Link',
-          pathname === MARKDOWN_PATH ? LINKS_FROM_MARKDOWN : LINKS_FROM_LLMS,
-        );
+        // Astro emits these as plain static files, so their Content-Type would
+        // otherwise depend on the origin's MIME guess for .md / .txt. Pin it so
+        // a direct hit matches what negotiation on / returns.
+        if (response.ok) {
+          headers.set('Content-Type', isMarkdown ? MARKDOWN_TYPE : TEXT_TYPE);
+        }
+        headers.set('Link', isMarkdown ? LINKS_FROM_MARKDOWN : LINKS_FROM_LLMS);
         appendVary(headers, 'Accept');
       });
     }
@@ -196,8 +206,13 @@ export default {
       });
 
       return withHeaders(markdownResponse, (headers) => {
-        headers.set('Content-Type', MARKDOWN_TYPE);
-        headers.set('Content-Location', MARKDOWN_PATH);
+        // Only relabel a body that really is the Markdown document. If the
+        // origin 404s or 5xxes, forcing text/markdown onto an HTML error page
+        // hides the failure behind a mislabelled response.
+        if (markdownResponse.ok) {
+          headers.set('Content-Type', MARKDOWN_TYPE);
+          headers.set('Content-Location', MARKDOWN_PATH);
+        }
         headers.set('Link', LINKS_FROM_MARKDOWN);
         appendVary(headers, 'Accept');
       });
