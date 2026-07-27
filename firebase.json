@@ -15,6 +15,24 @@
             "value": "</index.md>; rel=\"alternate\"; type=\"text/markdown\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\""
           }
         ]
+      },
+      {
+        "source": "/index.md",
+        "headers": [
+          {
+            "key": "Link",
+            "value": "</>; rel=\"alternate\"; type=\"text/html\", </llms.txt>; rel=\"describedby\"; type=\"text/plain\""
+          }
+        ]
+      },
+      {
+        "source": "/llms.txt",
+        "headers": [
+          {
+            "key": "Link",
+            "value": "</>; rel=\"alternate\"; type=\"text/html\", </index.md>; rel=\"alternate\"; type=\"text/markdown\""
+          }
+        ]
       }
     ]
   }
