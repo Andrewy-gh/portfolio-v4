@@ -31,7 +31,6 @@ export const skills: Skill[] = [
   { name: 'GitHub Actions', icon: 'simple-icons:githubactions' },
   { name: 'OpenAPI', icon: 'simple-icons:openapiinitiative' },
   { name: 'TanStack', icon: 'simple-icons:tanstack' },
-  { name: 'React Query', icon: 'simple-icons:reactquery' },
   { name: 'React Router', icon: 'simple-icons:reactrouter' },
   { name: 'shadcn/ui', icon: 'simple-icons:shadcnui' },
   { name: 'Hono', icon: 'simple-icons:hono' },
