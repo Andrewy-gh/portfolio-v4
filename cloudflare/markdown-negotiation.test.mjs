@@ -56,7 +56,7 @@ const cases = [
   ['agent tie resolves to md', '/', 'text/markdown, text/html', 200, 'text/markdown'],
   ['md only', '/', 'text/markdown', 200, 'text/markdown'],
   ['md q=0.9 beats html q=0.8', '/', 'text/markdown;q=0.9, text/html;q=0.8', 200, 'text/markdown'],
-  ['media type params ignored', '/', 'text/markdown;variant=GFM, text/html;q=0.5', 200, 'text/markdown'],
+  ['charset param still matches', '/', 'text/html;charset=utf-8', 200, 'text/html'],
   ['json falls back to md', '/', 'application/json, text/markdown;q=0.5', 200, 'text/markdown'],
   ['json alone is 406', '/', 'application/json', 406, 'text/plain'],
   ['image alone is 406', '/', 'image/png', 406, 'text/plain'],
@@ -72,6 +72,22 @@ const cases = [
   ['q=0 md + text/* -> html', '/', 'text/markdown;q=0, text/*', 200, 'text/html'],
   ['q=0 html + md -> md', '/', 'text/html;q=0, text/markdown', 200, 'text/markdown'],
   ['q=0 on both -> 406', '/', 'text/markdown;q=0, text/html;q=0, */*;q=0.5', 406, 'text/plain'],
+
+  // A strictly higher q wins outright. `explicit` is only a tie-breaker, so it
+  // must not let a lower-q exact match beat a higher-q wildcard.
+  ['text/* q=1 beats html q=0.5', '/', 'text/*;q=1, text/html;q=0.5', 200, 'text/markdown'],
+  ['*/* q=1 beats html q=0.5', '/', '*/*;q=1, text/html;q=0.5', 200, 'text/markdown'],
+  ['text/* q=0.9 beats html q=0.5', '/', 'text/html;q=0.5, text/*;q=0.9', 200, 'text/markdown'],
+
+  // Wildcard precedence: type/* is more specific than */* and must win, so a
+  // q=0 on text/* excludes both representations rather than being averaged out.
+  ['text/*;q=0 outranks */*', '/', 'text/*;q=0, */*', 406, 'text/plain'],
+  ['text/*;q=0 outranks */*;q=1', '/', 'text/*;q=0, */*;q=1', 406, 'text/plain'],
+
+  // A media range carrying parameters only matches a representation that has
+  // them. Neither representation is GFM, so only the html range applies.
+  ['variant=GFM does not match', '/', 'text/markdown;variant=GFM, text/html;q=0.5', 200, 'text/html'],
+  ['unmatched parameter alone -> 406', '/', 'text/markdown;variant=GFM', 406, 'text/plain'],
 ];
 
 for (const [label, path, accept, status, contentType] of cases) {
@@ -94,6 +110,22 @@ test('non-GET/HEAD requests are not negotiated', async () => {
     new Request('https://andrewy.me/', { method: 'POST', headers: { Accept: 'text/markdown' } }),
   );
   assert.match(res.headers.get('Content-Type') ?? '', /text\/html/);
+});
+
+test('a failed html origin response is not relabelled as html', async () => {
+  const saved = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response('upstream exploded', {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  try {
+    const res = await get('/', 'text/html');
+    assert.equal(res.status, 500);
+    assert.doesNotMatch(res.headers.get('Content-Type') ?? '', /text\/html/);
+  } finally {
+    globalThis.fetch = saved;
+  }
 });
 
 test('a failed markdown subrequest is not relabelled as markdown', async () => {

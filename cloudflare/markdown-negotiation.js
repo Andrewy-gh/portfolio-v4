@@ -23,10 +23,28 @@ const LINKS_FROM_LLMS = [
   `<${MARKDOWN_PATH}>; rel="alternate"; type="text/markdown"`,
 ].join(', ');
 
+// Parameters carried by every representation this worker serves. A media range
+// that names parameters only matches a representation that actually has them
+// (RFC 9110 12.5.1), so `text/markdown;variant=GFM` matches nothing here while
+// `text/html;charset=utf-8` still matches the HTML page.
+const REPRESENTATION_PARAMS = { charset: 'utf-8' };
+
+// Specificity tiers, most specific first. Used to pick which media range in the
+// header governs a given media type; a more specific range always wins, even
+// when a broader one carries a higher q-value.
+const TIER_NONE = 0;
+const TIER_ANY = 1; // matched the bare wildcard
+const TIER_TYPE = 2; // matched `type/` plus a wildcard subtype
+const TIER_EXACT = 3; // named the exact type
+const TIER_EXACT_PARAMS = 4; // named the exact type with matching parameters
+
 /**
- * Parse an Accept header into media ranges with their q-values.
- * Returns null when the header is absent or unparseable, which RFC 9110 treats
- * as "anything is acceptable".
+ * Parse an Accept header into media ranges with their q-values and any
+ * media-range parameters. Returns null when the header is absent or
+ * unparseable, which RFC 9110 treats as "anything is acceptable".
+ *
+ * Parameters before `q` belong to the media range; anything after `q` is
+ * accept-ext and is ignored.
  */
 function parseAccept(header) {
   if (!header) {
@@ -36,67 +54,99 @@ function parseAccept(header) {
   const entries = header
     .split(',')
     .map((part) => {
-      const [rawType, ...params] = part.split(';');
-      const type = rawType.trim().toLowerCase();
+      const segments = part.split(';');
+      const type = segments.shift().trim().toLowerCase();
 
       if (!type) {
         return null;
       }
 
       let q = 1;
+      let seenQ = false;
+      const params = [];
 
-      for (const param of params) {
-        const separator = param.indexOf('=');
+      for (const segment of segments) {
+        const separator = segment.indexOf('=');
 
         if (separator === -1) {
           continue;
         }
 
-        const key = param.slice(0, separator).trim().toLowerCase();
+        const key = segment.slice(0, separator).trim().toLowerCase();
+        const value = segment
+          .slice(separator + 1)
+          .trim()
+          .replace(/^"(.*)"$/, '$1');
 
-        if (key !== 'q') {
-          continue;
-        }
+        if (!seenQ && key === 'q') {
+          seenQ = true;
+          const parsed = Number.parseFloat(value);
 
-        const parsed = Number.parseFloat(param.slice(separator + 1).trim());
-
-        if (!Number.isNaN(parsed)) {
-          q = Math.min(Math.max(parsed, 0), 1);
+          if (!Number.isNaN(parsed)) {
+            q = Math.min(Math.max(parsed, 0), 1);
+          }
+        } else if (!seenQ) {
+          params.push([key, value.toLowerCase()]);
         }
       }
 
-      return { type, q };
+      return { type, q, params };
     })
     .filter(Boolean);
 
   return entries.length > 0 ? entries : null;
 }
 
-/**
- * Best q-value the client offered for a media type, considering `type/*` and
- * `*​/*` wildcards. Returns -1 when nothing in the header matches at all.
- * `explicit` distinguishes a wildcard match from the client naming the type.
- *
- * RFC 9110 §12.5.1: the most specific reference has precedence. An entry naming
- * the exact type therefore decides on its own — including an explicit `q=0`,
- * which a wildcard must not be able to raise back up. Taking a plain max across
- * both kinds of match would let a header that excludes HTML with `q=0` and then
- * accepts a bare wildcard still be served HTML.
- */
-function negotiate(entries, mediaType) {
-  const wildcard = `${mediaType.split('/')[0]}/*`;
-  let exact = -1;
-  let wild = -1;
-
-  for (const entry of entries) {
-    if (entry.type === mediaType) {
-      exact = Math.max(exact, entry.q);
-    } else if (entry.type === wildcard || entry.type === '*/*') {
-      wild = Math.max(wild, entry.q);
+/** How specifically one media range refers to `mediaType`. */
+function specificity(entry, mediaType) {
+  for (const [key, value] of entry.params) {
+    if (REPRESENTATION_PARAMS[key] !== value) {
+      return TIER_NONE;
     }
   }
 
-  return exact >= 0 ? { q: exact, explicit: true } : { q: wild, explicit: false };
+  if (entry.type === mediaType) {
+    return entry.params.length > 0 ? TIER_EXACT_PARAMS : TIER_EXACT;
+  }
+
+  if (entry.type === `${mediaType.split('/')[0]}/*`) {
+    return TIER_TYPE;
+  }
+
+  return entry.type === '*/*' ? TIER_ANY : TIER_NONE;
+}
+
+/**
+ * Effective quality the client assigned to a media type.
+ *
+ * RFC 9110 12.5.1: the most specific reference has precedence. Only ranges at
+ * the winning tier contribute, so a broad range can neither raise nor lower a
+ * value set by a narrower one — that is what makes `text/html;q=0` stick, and
+ * what makes a narrow `text/*;q=0` outrank a following bare wildcard.
+ *
+ * `explicit` reports whether the client named the type itself rather than
+ * reaching it through a wildcard. Returns -1 when nothing in the header matches.
+ */
+function negotiate(entries, mediaType) {
+  let tier = TIER_NONE;
+  let q = -1;
+
+  for (const entry of entries) {
+    const entryTier = specificity(entry, mediaType);
+
+    if (entryTier === TIER_NONE) {
+      continue;
+    }
+
+    if (entryTier > tier) {
+      tier = entryTier;
+      q = entry.q;
+    } else if (entryTier === tier) {
+      q = Math.max(q, entry.q);
+    }
+  }
+
+  return { q, explicit: tier >= TIER_EXACT };
 }
 
 /**
@@ -117,14 +167,23 @@ function selectRepresentation(acceptHeader) {
     return 'none';
   }
 
-  // Ties resolve to Markdown, but only when the client actually asked for it by
-  // name. Coding agents commonly send `text/markdown, text/html` with both at
-  // q=1; a browser's `*/*` also ties and must not flip to Markdown.
-  if (markdown.explicit && markdown.q > 0 && markdown.q >= html.q) {
+  // A strictly higher quality wins outright. `explicit` only breaks an exact
+  // tie: coding agents send `text/markdown, text/html` with both at q=1 and
+  // want Markdown, while a browser's bare wildcard ties the same way and must
+  // stay on HTML.
+  if (markdown.q > 0 && markdown.q > html.q) {
     return 'markdown';
   }
 
-  return html.q > 0 ? 'html' : 'markdown';
+  if (markdown.q > 0 && markdown.q === html.q && markdown.explicit) {
+    return 'markdown';
+  }
+
+  if (html.q > 0) {
+    return 'html';
+  }
+
+  return markdown.q > 0 ? 'markdown' : 'none';
 }
 
 function appendVary(headers, value) {
@@ -221,7 +280,11 @@ export default {
     const response = await fetch(request);
 
     return withHeaders(response, (headers) => {
-      headers.set('Content-Type', HTML_TYPE);
+      // Same guard as the Markdown paths: an origin 4xx/5xx body is not the
+      // HTML page, so labelling it text/html would hide the failure.
+      if (response.ok) {
+        headers.set('Content-Type', HTML_TYPE);
+      }
       headers.set('Link', LINKS_FROM_HTML);
       appendVary(headers, 'Accept');
     });
