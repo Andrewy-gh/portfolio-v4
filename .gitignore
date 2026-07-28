@@ -12,6 +12,12 @@ dist
 .astro
 *.local
 
+# Secrets. The Cloudflare API token for querying Analytics Engine lives here.
+.env
+.env.*
+!.env.example
+.dev.vars
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
