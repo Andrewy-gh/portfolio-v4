@@ -208,6 +208,108 @@ function withHeaders(response, updateHeaders) {
   });
 }
 
+// Named agents are matched before the browser heuristic, because nearly all of
+// them prefix their User-Agent with "Mozilla/5.0". Deliberately not an
+// allowlist: anything unrecognised is bucketed as `other` or `library` but its
+// raw User-Agent is still recorded, so a new agent stays discoverable.
+const AGENT_PATTERNS = [
+  ['chatgpt-user', /chatgpt-user/i],
+  ['oai-searchbot', /oai-searchbot/i],
+  ['gptbot', /gptbot/i],
+  ['claude-code', /claude-code/i],
+  ['claude-user', /claude-user/i],
+  ['claude-searchbot', /claude-searchbot/i],
+  ['claudebot', /claudebot/i],
+  ['perplexity', /perplexity/i],
+  ['google-extended', /google-extended/i],
+  ['googlebot', /googlebot/i],
+  ['bingbot', /bingbot/i],
+  ['applebot', /applebot/i],
+  ['bytespider', /bytespider/i],
+  ['ccbot', /ccbot/i],
+  ['meta', /meta-externalagent|facebookbot/i],
+  ['amazonbot', /amazonbot/i],
+  ['cohere', /cohere-ai/i],
+  ['duckduckbot', /duckduckbot/i],
+];
+
+const LIBRARY = /curl|wget|python|node-fetch|go-http|okhttp|java|ruby|axios|got\//i;
+const NOT_A_BROWSER = /bot|crawler|spider|scraper|http|python|curl|wget|node/i;
+const BROWSER = /mozilla\/5\.0.*(chrome|safari|firefox|edg|opr)/i;
+
+/** Bucket a User-Agent. The result is the single Analytics Engine index. */
+function classifyAgent(userAgent) {
+  if (!userAgent) {
+    return 'none';
+  }
+
+  for (const [name, pattern] of AGENT_PATTERNS) {
+    if (pattern.test(userAgent)) {
+      return name;
+    }
+  }
+
+  if (BROWSER.test(userAgent) && !NOT_A_BROWSER.test(userAgent)) {
+    return 'browser';
+  }
+
+  return LIBRARY.test(userAgent) ? 'library' : 'other';
+}
+
+function truncate(value, max) {
+  return (value ?? '').slice(0, max);
+}
+
+function referrerHost(request) {
+  const referrer = request.headers.get('Referer');
+
+  if (!referrer) {
+    return '';
+  }
+
+  try {
+    return new URL(referrer).hostname;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Record which representation was served. Nothing else in the stack can see
+ * this: HTML and Markdown share the URL `/` and the choice is made here from
+ * the Accept header.
+ *
+ * writeDataPoint is synchronous and queues the write in the background, so it
+ * does not need ctx.waitUntil. Deliberately no IP address, no query string and
+ * only the referrer hostname — this is a traffic census, not a visitor log.
+ * `env` is absent under test, where this must no-op.
+ */
+function record(env, request, pathname, representation, status) {
+  const dataset = env?.AI_TRAFFIC;
+
+  if (!dataset || typeof dataset.writeDataPoint !== 'function') {
+    return;
+  }
+
+  const userAgent = request.headers.get('User-Agent') ?? '';
+
+  try {
+    dataset.writeDataPoint({
+      indexes: [classifyAgent(userAgent)],
+      blobs: [
+        representation,
+        pathname,
+        truncate(userAgent, 256),
+        truncate(request.headers.get('Accept'), 256),
+        referrerHost(request),
+      ],
+      doubles: [status],
+    });
+  } catch {
+    // Telemetry must never be able to affect a response.
+  }
+}
+
 function notAcceptable() {
   return new Response(
     'Not Acceptable. This resource is available as text/html and text/markdown.\n',
@@ -223,7 +325,9 @@ function notAcceptable() {
 }
 
 export default {
-  async fetch(request) {
+  // `env` carries the AI_TRAFFIC Analytics Engine binding. Both it and `ctx`
+  // are optional so the worker stays callable as fetch(request) under test.
+  async fetch(request, env) {
     const url = new URL(request.url);
     const { pathname } = url;
     const isReadRequest =
@@ -234,6 +338,14 @@ export default {
     if (pathname === MARKDOWN_PATH || pathname === LLMS_PATH) {
       const response = await fetch(request);
       const isMarkdown = pathname === MARKDOWN_PATH;
+
+      record(
+        env,
+        request,
+        pathname,
+        isMarkdown ? 'markdown' : 'llms',
+        response.status,
+      );
 
       return withHeaders(response, (headers) => {
         // Astro emits these as plain static files, so their Content-Type would
@@ -254,6 +366,7 @@ export default {
     const representation = selectRepresentation(request.headers.get('Accept'));
 
     if (representation === 'none') {
+      record(env, request, pathname, '406', 406);
       return notAcceptable();
     }
 
@@ -263,6 +376,14 @@ export default {
         headers: request.headers,
         redirect: 'follow',
       });
+
+      record(
+        env,
+        request,
+        pathname,
+        'markdown',
+        markdownResponse.status,
+      );
 
       return withHeaders(markdownResponse, (headers) => {
         // Only relabel a body that really is the Markdown document. If the
@@ -278,6 +399,8 @@ export default {
     }
 
     const response = await fetch(request);
+
+    record(env, request, pathname, 'html', response.status);
 
     return withHeaders(response, (headers) => {
       // Same guard as the Markdown paths: an origin 4xx/5xx body is not the

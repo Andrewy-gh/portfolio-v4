@@ -8,5 +8,14 @@
       "pattern": "andrewy.me/*",
       "zone_name": "andrewy.me"
     }
+  ],
+  // Records which representation each request was served. Nothing else in the
+  // stack can see that: HTML and Markdown share the URL "/" and the choice is
+  // made from the Accept header inside the worker.
+  "analytics_engine_datasets": [
+    {
+      "binding": "AI_TRAFFIC",
+      "dataset": "portfolio_ai_traffic"
+    }
   ]
 }

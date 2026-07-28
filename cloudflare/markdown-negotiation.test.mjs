@@ -100,6 +100,76 @@ for (const [label, path, accept, status, contentType] of cases) {
   });
 }
 
+// --- Analytics Engine instrumentation ---------------------------------------
+
+function recordingEnv() {
+  const points = [];
+  return { points, env: { AI_TRAFFIC: { writeDataPoint: (p) => points.push(p) } } };
+}
+
+async function getWith(env, path, accept, headers = {}) {
+  return worker.fetch(
+    new Request(`https://andrewy.me${path}`, {
+      headers: { ...(accept ? { Accept: accept } : {}), ...headers },
+    }),
+    env,
+  );
+}
+
+test('records the representation actually served', async () => {
+  const { points, env } = recordingEnv();
+
+  await getWith(env, '/', 'text/markdown, text/html', { 'User-Agent': 'claude-code/1.0' });
+  await getWith(env, '/', '*/*', { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/126 Safari/537.36' });
+  await getWith(env, '/', 'application/json');
+  await getWith(env, '/llms.txt', '*/*');
+
+  assert.deepEqual(
+    points.map((p) => [p.indexes[0], p.blobs[0]]),
+    [
+      ['claude-code', 'markdown'],
+      ['browser', 'html'],
+      ['none', '406'],
+      ['none', 'llms'],
+    ],
+  );
+  assert.equal(points[2].doubles[0], 406, 'status is recorded');
+});
+
+test('classifies named agents ahead of the browser heuristic', async () => {
+  const uas = {
+    'chatgpt-user': 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+    gptbot: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2',
+    claudebot: 'Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)',
+    perplexity: 'Mozilla/5.0 (compatible; PerplexityBot/1.0)',
+    googlebot: 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+    browser: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+    library: 'curl/8.4.0',
+  };
+
+  for (const [expected, ua] of Object.entries(uas)) {
+    const { points, env } = recordingEnv();
+    await getWith(env, '/', '*/*', { 'User-Agent': ua });
+    assert.equal(points[0].indexes[0], expected, `for UA: ${ua}`);
+  }
+});
+
+test('records referrer host only, never a full URL', async () => {
+  const { points, env } = recordingEnv();
+  await getWith(env, '/', '*/*', { Referer: 'https://chatgpt.com/c/abc123?secret=1' });
+  assert.equal(points[0].blobs[4], 'chatgpt.com');
+});
+
+test('telemetry no-ops without a binding and never breaks a response', async () => {
+  const res = await worker.fetch(new Request('https://andrewy.me/', { headers: { Accept: '*/*' } }));
+  assert.equal(res.status, 200);
+
+  const throwing = { AI_TRAFFIC: { writeDataPoint() { throw new Error('analytics down'); } } };
+  const stillOk = await getWith(throwing, '/', 'text/markdown');
+  assert.equal(stillOk.status, 200);
+  assert.match(stillOk.headers.get('Content-Type') ?? '', /markdown/);
+});
+
 test('non-negotiated paths pass through untouched', async () => {
   const res = await worker.fetch(new Request('https://andrewy.me/_astro/app.js'));
   assert.equal(res.headers.get('Link'), null);
