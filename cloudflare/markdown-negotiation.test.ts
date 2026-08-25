@@ -11,7 +11,24 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from './markdown-negotiation.js';
 
-const ORIGIN = {
+type OriginEntry = [body: string, contentType: string];
+type DataPoint = {
+  indexes: string[];
+  blobs: string[];
+  doubles: number[];
+};
+type AnalyticsEnv = {
+  AI_TRAFFIC: { writeDataPoint: (point: DataPoint) => void };
+};
+type Case = [
+  label: string,
+  path: string,
+  accept: string | null,
+  status: number,
+  contentType: string,
+];
+
+const ORIGIN: Record<string, OriginEntry> = {
   '/': ['<!doctype html><html></html>', 'text/html; charset=utf-8'],
   '/index.html': ['<!doctype html><html></html>', 'text/html; charset=utf-8'],
   '/index.md': ['# Andy Yu\n', 'text/markdown; charset=utf-8'],
@@ -36,8 +53,7 @@ after(() => {
   globalThis.fetch = realFetch;
 });
 
-/** @param {string} path @param {string|null} accept */
-async function get(path, accept) {
+async function get(path: string, accept: string | null) {
   return worker.fetch(
     new Request(`https://andrewy.me${path}`, {
       headers: accept ? { Accept: accept } : {},
@@ -46,7 +62,7 @@ async function get(path, accept) {
 }
 
 /** [label, path, Accept, expected status, expected Content-Type substring] */
-const cases = [
+const cases: Case[] = [
   ['no Accept header', '/', null, 200, 'text/html'],
   ['*/* from curl', '/', '*/*', 200, 'text/html'],
   ['browser default', '/', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 200, 'text/html'],
@@ -103,11 +119,19 @@ for (const [label, path, accept, status, contentType] of cases) {
 // --- Analytics Engine instrumentation ---------------------------------------
 
 function recordingEnv() {
-  const points = [];
-  return { points, env: { AI_TRAFFIC: { writeDataPoint: (p) => points.push(p) } } };
+  const points: DataPoint[] = [];
+  const env: AnalyticsEnv = {
+    AI_TRAFFIC: { writeDataPoint: (point) => points.push(point) },
+  };
+  return { points, env };
 }
 
-async function getWith(env, path, accept, headers = {}) {
+async function getWith(
+  env: AnalyticsEnv,
+  path: string,
+  accept: string | null,
+  headers: Record<string, string> = {},
+) {
   return worker.fetch(
     new Request(`https://andrewy.me${path}`, {
       headers: { ...(accept ? { Accept: accept } : {}), ...headers },
@@ -173,6 +197,20 @@ test('telemetry no-ops without a binding and never breaks a response', async () 
 test('non-negotiated paths pass through untouched', async () => {
   const res = await worker.fetch(new Request('https://andrewy.me/_astro/app.js'));
   assert.equal(res.headers.get('Link'), null);
+});
+
+test('missing paths give markdown clients a recoverable real 404', async () => {
+  const res = await get('/path-that-does-not-exist', 'text/markdown');
+  assert.equal(res.status, 404);
+  assert.match(res.headers.get('Content-Type') ?? '', /text\/markdown/);
+  assert.match(await res.text(), /llms\.txt/);
+  assert.match(res.headers.get('Link') ?? '', /rel="alternate"/);
+});
+
+test('missing paths preserve the origin 404 for html clients', async () => {
+  const res = await get('/path-that-does-not-exist', 'text/html');
+  assert.equal(res.status, 404);
+  assert.match(await res.text(), /not found/);
 });
 
 test('non-GET/HEAD requests are not negotiated', async () => {

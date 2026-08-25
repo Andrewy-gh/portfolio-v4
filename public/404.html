@@ -36,9 +36,14 @@
         line-height: 1.6;
       }
 
+      ul {
+        padding: 0;
+        list-style: none;
+      }
+
       a {
         display: inline-block;
-        margin-top: 1rem;
+        margin-top: 0.5rem;
         color: #65bfff;
         font-weight: 700;
       }
@@ -46,9 +51,14 @@
   </head>
   <body>
     <main>
-      <h1>Page not found</h1>
-      <p>The page you requested does not exist. Return to the portfolio to explore Andy's work.</p>
-      <a href="/">Return home</a>
+      <h1>404 — Page not found</h1>
+      <p>The requested path does not exist. Try one of these agent-friendly starting points:</p>
+      <ul>
+        <li><a href="/">Portfolio home</a></li>
+        <li><a href="/sitemap.xml">XML sitemap</a></li>
+        <li><a href="/llms.txt">Agent index (llms.txt)</a></li>
+        <li><a href="/index.md">Portfolio in Markdown</a></li>
+      </ul>
     </main>
   </body>
 </html>

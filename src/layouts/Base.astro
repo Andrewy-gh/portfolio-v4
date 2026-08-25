@@ -44,8 +44,7 @@ const ogImage = new URL('/og-image.png', Astro.site).href;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
 
-    <!-- Structured data. Retained for search engines; controlled tests show
-         LLMs ignore JSON-LD, so this is not part of the AI-visibility work. -->
+    <!-- Machine-readable identity for search engines and agents. -->
     <script
       is:inline
       type="application/ld+json"
@@ -53,9 +52,12 @@ const ogImage = new URL('/og-image.png', Astro.site).href;
         '@context': 'https://schema.org',
         '@type': 'Person',
         name: site.name,
+        description: site.description,
         url: site.url,
+        image: ogImage,
         jobTitle: site.role,
-        knowsAbout: ['TypeScript', 'React', 'Node.js', 'Open Source'],
+        sameAs: [site.github, site.linkedin, site.twitter],
+        knowsAbout: ['TypeScript', 'React', 'Node.js', 'Go', 'PostgreSQL', 'Open Source'],
       })}
     />
   </head>

@@ -11,6 +11,8 @@ export const site = {
   summary:
     'Andy Yu is a full stack software engineer who builds reliable, accessible web applications across frontend and backend systems. His primary tools include TypeScript, React, Node.js, Go, PostgreSQL, and modern testing and deployment tooling.',
   github: 'https://github.com/Andrewy-gh',
+  linkedin: 'https://www.linkedin.com/in/andrewydev/',
+  twitter: 'https://twitter.com/a_ydev',
   repo: 'https://github.com/Andrewy-gh/portfolio-v4',
   typewriter: [
     'Software Engineer',

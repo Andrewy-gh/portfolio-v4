@@ -273,8 +273,9 @@ button,
   color: var(--text);
 }
 
-.contact h4 {
+.contact h2 {
   color: var(--text);
+  font-size: var(--step-1);
 }
 
 /* ? Theme toggle: show the icon for the mode you can switch *to*. */

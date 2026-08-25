@@ -310,6 +310,29 @@ function record(env, request, pathname, representation, status) {
   }
 }
 
+function agentNotFound(request) {
+  const body = [
+    '# 404 — Page not found',
+    '',
+    'The requested path does not exist. Continue with:',
+    '',
+    '- [Portfolio home](/)',
+    '- [XML sitemap](/sitemap.xml)',
+    '- [Agent index](/llms.txt)',
+    '- [Portfolio in Markdown](/index.md)',
+    '',
+  ].join('\n');
+
+  return new Response(request.method === 'HEAD' ? null : body, {
+    status: 404,
+    headers: {
+      'Content-Type': MARKDOWN_TYPE,
+      Link: LINKS_FROM_MARKDOWN,
+      Vary: 'Accept',
+    },
+  });
+}
+
 function notAcceptable() {
   return new Response(
     'Not Acceptable. This resource is available as text/html and text/markdown.\n',
@@ -360,7 +383,18 @@ export default {
     }
 
     if (!HTML_PATHS.has(pathname) || !isReadRequest) {
-      return fetch(request);
+      const response = await fetch(request);
+      const wantsMarkdown =
+        isReadRequest &&
+        response.status === 404 &&
+        selectRepresentation(request.headers.get('Accept')) === 'markdown';
+
+      if (wantsMarkdown) {
+        record(env, request, pathname, '404-markdown', 404);
+        return agentNotFound(request);
+      }
+
+      return response;
     }
 
     const representation = selectRepresentation(request.headers.get('Accept'));
